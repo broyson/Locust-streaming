@@ -1,5 +1,9 @@
 import requests
 import time
+import logging
+import random
+
+logger = logging.getLogger(__name__)
 
 
 def get_segment_url(ism_url, base_url, media_segment):
@@ -23,18 +27,19 @@ def create_request(url):
 
 
 def create_segment(
-        media_segment, ism_url, protocol, time, segment_duration,
+    media_segment, ism_url, protocol, time, segment_duration,
         segment_timeline):
-        segment = create_segment_timeline(
-            ism_url,
-            protocol,
-            media_segment,
-            time,
-            segment_duration
-        )
-        segment_timeline.append(segment)
-        time = time + segment_duration
-        return time, segment_timeline
+
+    segment = create_segment_timeline(
+        ism_url,
+        protocol,
+        media_segment,
+        time,
+        segment_duration
+    )
+    segment_timeline.append(segment)
+    time = time + segment_duration
+    return time, segment_timeline
 
 
 def create_segments_timeline(
@@ -63,6 +68,7 @@ def create_segments_timeline(
                     segment_duration,
                     segment_timeline
                 )
+                media_segment = media_repr.replace("$Time$", str(time))
         elif segment.t is None and segment.r is None:
             media_segment = media_repr.replace("$Time$", str(time))
             time, segment_timeline = create_segment(
@@ -105,7 +111,7 @@ def prepare_playlist(ism_url, mpd):
     period_s: dict of timelines for each representation and dict of bitrates
     available
     """
-    print("Preparing timeline...")
+    logger.info("Preparing timeline...")
     all_reprs = []
     period_s = {}
     for period in mpd.periods:
@@ -151,34 +157,62 @@ def get_segment_duration(period_segments, chosen_quality, index):
     return segment_duration
 
 
-def simple_playback(self, period_segments, chosen_video, chosen_audio):
+def simple_playback(self, period_segments, chosen_video, chosen_audio, delay):
     number_video_segments = period_segments["repr"][chosen_video]["size"]
     for i in range(0, number_video_segments - 1):
         video_segment = period_segments["repr"][chosen_video]["timeline"][i]["url"]
         self.client.get(video_segment)
         print(video_segment)
+        # logger.info(response.status_code)
         segment_duration = get_segment_duration(
             period_segments, chosen_video, i
         )
-        print(f"Sleep video for: {segment_duration} sec")
-        self._sleep(segment_duration)
+        if delay:
+            logger.info(f"Sleeping client for: {segment_duration} seconds")
+            self._sleep(segment_duration)
+        else:
+            pass
         for j in range(0, 2):
             audio_segment = period_segments["repr"][chosen_audio]["timeline"][i + j]["url"]
-            print(audio_segment)
             self.client.get(audio_segment)
+            print(audio_segment)
             segment_duration = get_segment_duration(
                 period_segments, chosen_video, i
             )
-            print(f"Audio segment_duration of: {segment_duration} sec")
+    logger.info("******* Finished playing the whole timeline *******")
 
-    print("******* Finished playing the whole timeline *******")
 
+def simple_live_playback(self, period_segments, chosen_video, chosen_audio, delay):
+    number_video_segments = period_segments["repr"][chosen_video]["size"]
+    for i in range(0, int(number_video_segments/2) - 1):
+        video_segment = period_segments["repr"][chosen_video]["timeline"][i]["url"]
+        response = self.client.get(video_segment)
+        period_segments["repr"][chosen_video]["timeline"].pop(i)
+        print(video_segment)
+        logger.info(response.status_code)
+        segment_duration = get_segment_duration(
+            period_segments, chosen_video, i
+        )
+        if delay:
+            logger.info(f"Sleeping client for: {segment_duration} seconds")
+            self._sleep(segment_duration)
+        else:
+            pass
+        for j in range(0, 2):
+            audio_segment = period_segments["repr"][chosen_audio]["timeline"][i + j]["url"]
+            self.client.get(audio_segment)
+            print(audio_segment)
+            segment_duration = get_segment_duration(
+                period_segments, chosen_video, i
+            )
+    return period_segments
+    logger.info("******* Finished playing the whole timeline *******")
 
 def simple_buffer(self, segment_count, buffer_size, segment_duration):
     min_buffer = buffer_size/2
     if segment_count >= min_buffer:
         # wait for the last segment duration
-        print(f"Buffering for {segment_duration} seconds ")
+        logger.info(f"Buffering for {segment_duration} seconds ")
         time.sleep(segment_duration)
         self._sleep(segment_duration)
         segment_count = 0
@@ -209,7 +243,7 @@ def get_channel_rate(http_response):
             content_length = content_length * 8  # KB to kilobits
             channel_rate = content_length / (download_duration * 1000)  # [kbps]
     else:
-        print(f"Error request with code: {code} ")
+        logger.error(f"Error request with code: {code} ")
         channel_rate = 0
         content_length = None
         download_duration = None
@@ -228,30 +262,31 @@ def buffer_model(
     Returns:
     updated buffer_level
     """
-    print(f"*** buffer level t ***: {buffer_level} seconds")
+    logger.info(f"Buffer level: {buffer_level} seconds")
     delta_t = buffer_level - download_duration + segment_duration - max_buffer
     delta_t = abs(delta_t)
     diff = buffer_level - download_duration + segment_duration
-    # udpdate buffer level
+    # Update buffer level
     buffer_level = buffer_level + segment_duration - download_duration
 
     if (diff < max_buffer):
-        # request (t + 1)-th segment
+        # Request (t + 1)-th segment
         return buffer_level
     else:
-        buffer_level -= delta_t  # creates playback
-        print(f"Buffering for {delta_t} seconds")
+        buffer_level -= delta_t  # Creates playback
+        logger.info(f"Buffering for {delta_t} seconds")
         self._sleep(delta_t)
-        time.sleep(delta_t)  # wait before (t + 1)-th segment is requested
+        time.sleep(delta_t)  # Wait before (t + 1)-th segment is requested
         return buffer_level
 
 
 def playback_w_buffer(
         self, period_segments, chosen_video, chosen_audio, max_buffer=10):
     """
-    Apply buffer
+    Apply buffer by max_buffer parameter
     """
     if isinstance(max_buffer, int):
+        logger.info(f"Buffer size: {max_buffer}")
         segment_count = 1  # empty buffer initialized
         buffer_level = 0  # buffer starts empty
         number_video_segments = period_segments["repr"][chosen_video]["size"]
@@ -259,37 +294,39 @@ def playback_w_buffer(
 
         for i in range(0, number_video_segments - 1):
             video_segment = segments[chosen_video]["timeline"][i]["url"]
-            print(video_segment)
+            logger.info(video_segment)
             response = self.client.get(video_segment)
             channel_rate, download_duration = get_channel_rate(response)
             segment_duration = get_segment_duration(
                 period_segments, chosen_video, i
             )
-            print(f"Video segment duration of : {segment_duration}")
+            logger.info(f"Video segment duration: {segment_duration} seconds")
             buffer_level = buffer_model(
                 self,
                 buffer_level, segment_duration, download_duration, max_buffer
             )
             segment_count += i
-            print(f"segment_count: {segment_count}")
+            logger.info(f"Number of segments in buffer: {segment_count}")
             for j in range(0, 2):
-                audio_segment = segments[chosen_audio]["timeline"][i + j]["url"]
-                print(audio_segment)
+                audio_segment = segments[chosen_audio]["timeline"][i+j]["url"]
+                logger.info(audio_segment)
                 self.client.get(audio_segment)
                 segment_duration = get_segment_duration(
                     period_segments, chosen_audio, i+j
                 )
-                print(f"Audio segment_duration of: {segment_duration} seconds")
+                logger.info(
+                    f"Audio segment duration : {segment_duration} seconds"
+                )
 
     else:
-        print(f"Your buffer size needs to be an integer")
+        logger.error(f"Your buffer size needs to be an integer")
         return
 
 
 def select_representation(abr, option):
     """
-    Dummy way to select the bitrate
-    abr: dict represenation[] and bandwidths[]
+    Select AdaptationSet with minimum or maximum bitrate
+    abr: dictionary with represenation[] and bandwidths[]
     option: int 0-> lowest bitrate, 1-> highest bitrate
     """
     selected_audio = None
@@ -298,10 +335,13 @@ def select_representation(abr, option):
     selected_representation = []
     for type_content, content in abr.items():
         if type_content in slected_type:
-            if option == 1:
+
+            if option == "highest_bitrate":
                 bitrate = max(content["bandwidth"])
-            else:
+            elif option == "lowest_bitrate":
                 bitrate = min(content["bandwidth"])
+            else:
+                bitrate = random.choice(content["bandwidth"])
 
             index = content["bandwidth"].index(bitrate)
             representation = content["representation"][index]

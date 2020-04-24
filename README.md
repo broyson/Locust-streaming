@@ -15,32 +15,166 @@ Install the pip3 requirements as follows:
 pip3 install -r requirements.txt
 ```
 
-Move to the folder `load_generator/locustfiles/`, add the env variables,
-and run locust command.
+In the command-line move to directory path `load_generator/`, add
+the env variables, and run locust command as follows.
 
-Replace the ${ORIGIN} with the IP of your Origin the load test.
 ```
-export HOST=${ORIGIN}
-```
-Run MPEG-DASH script:
-```
-HOST_URL=http://${HOST} MANIFEST_FILE=tears-of-steel-avc1.ism locust  -f dash_sequence.py
+cd load_generator
 ```
 
-Run HLS script:
+Replace the `${ORIGIN_IP}` variable with the IP of the Origin host that will
+be stressed.
 ```
-HOST_URL=http://${HOST} MANIFEST_FILE=tears-of-steel-avc1.ism locust  -f hls_player.py
+export HOST=${ORIGIN_IP}
 ```
 
+## Run a load test example with web UI enabled
 
-# Run Locust client emulator in distributed mode for Ubuntu 18.04
-To emulate clients in distributed mode you will need to have at least one master
-and one slave node in your cloud infrastructure. In each of these nodes you will
-need to pull this repository and install the software from `requirements.txt`.
+In this example will run locally the Origin sever in port `80` Locust web UI
+in port `8089`.
+
+Set host of Orign server to stress test.
+```
+export HOST=localhost
+```
+
+Run MPEG-DASH example script(`dash_sequence.py`):
+```
+HOST_URL=http://${HOST} \
+MANIFEST_FILE=tears-of-steel-avc1.ism \
+mode=vod locust  -f locustfiles/dash_sequence.py
+```
+
+Run HLS example script(`hls_player.py`):
+```
+HOST_URL=http://${HOST} \
+MANIFEST_FILE=tears-of-steel-avc1.ism \
+mod=vod locust  -f locustfiles/hls_player.py
+```
+
+After runnin one of the previous commands, access Lucust web UI in
+`http://localhost:8089`, type the number of total users to spawn and the hatch
+rate. Then run the test by clicking `Start swarming` button.
 
 
-Pull Github repository to each of the node and install the following
-requirements.
+## Run a load test example without web UI locally
+
+Set host of Orign server to stress test.
+```
+export HOST=localhost
+```
+
+1) Create a MPEG-DASG stress test by providing the `.ism` file in
+`dash_sequence.py`.
+ 
+
+```
+HOST_URL=http://${HOST}  \ 
+  MANIFEST_FILE=tears-of-steel-avc1.ism \
+  mode=vod locust \
+  -f locustfiles/dash_sequence.py \
+  --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+### Create a stress test(`vod_dash_hls_sequence.py`) to a VOD endpoint by providing an `.mpd` MPEG-DASH manifest or an HLS`.m3u8` master playlist.
+
+1) MPEG-DASH test example that requests all available segments with the lowest
+bit-rate.
+```
+HOST_URL=http://${HOST} \
+  MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd \
+  mode=vod \
+  play_mode=full_playback \
+  bitrate=lowest_bitrate \
+  locust -f locustfiles/vod_dash_hls_sequence.py \
+  --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+2) MPEG-DASH test example that requests all available segments with the highest
+bit-rate.
+```
+HOST_URL=http://${HOST} \
+  MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd \
+  mode=vod \
+  play_mode=random_segments \
+  bitrate=highest_bitrate \
+  locust -f locustfiles/vod_dash_hls_sequence.py \
+  --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+3) HLS test example that requests all available segments with highest bit-rate.
+```
+HOST_URL=http://${HOST} \
+  MANIFEST_FILE=tears-of-steel-avc1.ism/.m3u8 \
+  mode=vod \
+  play_mode=full_playback \
+  bitrate=highest_bitrate \
+  locust -f locustfiles/vod_dash_hls_sequence.py \
+  --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+4) MEPG-DASH test example that requests all live segments of a Live publishing
+point with the highest bit-rates available.
+
+In this example, our publishing point to stress is located in
+`test/test.isml/.mpd ` with IP `192.168.178.233` and  port `8818`. Therefore,
+we replace the HOST IP from the environment variables and the `MANIFEST_FILE`
+variable from the command-line.
+
+```
+export HOST=192.168.178.233:8818
+```
+
+```
+HOST_URL=http://${HOST} \
+  MANIFEST_FILE=test/test.isml/.mpd \
+  mode=live \
+  play_mode=full_playback \
+  bitrate=highest_bitrate \
+  locust -f locustfiles/vod_dash_hls_sequence.py \
+  --no-web -c 1 -r 1 --run-time 10s --only-summary
+
+```
+
+## Using load_generator with docker image
+
+Example using Docker image for an MPEG-DASH manifet
+```
+docker run \
+    -e "HOST_URL=http://192.168.178.233" \
+    -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd" \
+    -e "mode=vod" \
+    -e "play_mode=full_playback" \
+    -e "bitrate=lowest_bitrate" \
+    locust-streaming \
+    -f /load_generator/locustfiles/vod_dash_hls_sequence.py \
+    --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+In case you need to use other Locust files that are outside the Docker image.
+```
+docker run \
+    -e "HOST_URL=http://192.168.178.233" \
+    -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd" \
+    -e "mode=vod" \
+    -e "play_mode=full_playback" \
+    -e "bitrate=lowest_bitrate" \
+    -v ${PWD}/:/test/ \
+    locust-streaming  \
+    -f /test/load_generator/locustfiles/vod_dash_hls_sequence.py \
+    --no-web -c 1 -r 1 --run-time 10s --only-summary
+
+```
+
+# Locust set in distributed mode
+
+##  Run Locust client emulator in distributed mode for Ubuntu 18.04
+To emulate clients in distributed mode you will need to have at least one
+master and one slave node in your cloud infrastructure. In each of these nodes 
+you will need to pull this repository and install the dependencies software
+from `requirements.txt`.
+
+
 ```
 sudo apt-get update
 ```
@@ -55,7 +189,6 @@ Install the pip3 requirements as follows:
 pip3 install -r requirements.txt
 ```
 
-
 Master/slave ENV configuration variables example:
 ```
 export ORIGIN=ip-172-31-3-3.eu-central-1.compute.internal
@@ -69,17 +202,24 @@ export EXPECTED_SLAVES=4
 ## DASH emulator using step load with Locust UI
 Master node
 ```
-HOST_URL=http://${ORIGIN} MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism locust  -f dash_sequence.py --master --expect-slaves=${EXPECTED_SLAVES} --step-load --csv=example
+HOST_URL=http://${ORIGIN} \
+  MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism \ 
+  locust  -f dash_sequence.py \ 
+  --master --expect-slaves=${EXPECTED_SLAVES} \
+  --step-load --csv=example
 ```
 
 Slave node
 ```
-HOST_URL=http://${ORIGIN} MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism locust  -f dash_sequence.py --slave --master-host=${MASTER_CLIENT} --step-load
+HOST_URL=http://${ORIGIN} \ 
+  MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism locust \
+  -f dash_sequence.py 
+  --slave --master-host=${MASTER_CLIENT} 
+  --step-load
 
 ```
-Access to your http://${ORIGIN}:8089 to visualise Locust UI and to run a
+Access to your master node in port `8089` to visualise Locust UI and to run a
 test.
-
 
 Example test from Locust UI
 ```
@@ -89,25 +229,22 @@ Example test from Locust UI
 2s seconds new step
 ```
 
-
-## DASH emulator using step load with Locust UI
+## Run HLS example without UI
 Master node
 ```
-HOST_URL=http://${ORIGIN} MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism locust  -f hls.py --master --expect-slaves=${EXPECTED_SLAVES} --step-load --csv=example
+HOST_URL=http://${ORIGIN} \ 
+  MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism \ 
+  locust  -f hls.py \ 
+  --master --expect-slaves=${EXPECTED_SLAVES}  \
+  --no-web -c 100 -r 10 --run-time 2m \ 
+  --step-load --step-clients 10 \
+  --step-time 10s --csv=example
 ```
 
 Slave node
 ```
-HOST_URL=http://${ORIGIN} MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism locust  -f hls.py --slave --master-host=${MASTER_CLIENT} --step-load
-
-```
-Access to your http://${ORIGIN}:8089 to visualise Locust UI and to run a
-test.
-
-Example test from Locust UI
-```
-200 users
-20 hatch rate
-10 users step
-2s seconds new step
+HOST_URL=http://${ORIGIN} \ 
+  MANIFEST_FILE=tears-of-steel/tears-of-steel-en.ism \ 
+  locust  -f hls.py \ 
+  --slave --master-host=${MASTER_CLIENT} --step-load
 ```

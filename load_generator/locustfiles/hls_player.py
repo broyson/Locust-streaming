@@ -5,16 +5,24 @@
 ##################################################
 # Author: Mark Ogle
 # License: MIT
-# Mmaintainer: roberto@unified-streaming.com
 # Email: mark@unified-streaming.com
+# Maintainer: roberto@unified-streaming.com
 ##################################################
 
 import os
 from locust import HttpLocust, TaskSet, task, between
 import m3u8
 import logging
+import resource
+import sys
+
+if sys.version_info[0] < 3:
+    raise Exception("Must be using Python 3")
 
 logger = logging.getLogger(__name__)
+print(resource.getrlimit(resource.RLIMIT_NOFILE))
+# set the highest limit of open files in the server
+resource.setrlimit(resource.RLIMIT_NOFILE, resource.getrlimit(resource.RLIMIT_NOFILE))
 
 MANIFEST_FILE = os.getenv('MANIFEST_FILE')
 
@@ -38,25 +46,22 @@ class PlayerTaskSet(TaskSet):
         # get manifest
         # single content
         master_url = f"{base_url}/.m3u8"
-        print(f"Requesting Master playlist: {master_url}")
         master_m3u8 = self.client.get(master_url, name="merged")
         parsed_master_m3u8 = m3u8.M3U8(content=master_m3u8.text, base_uri=base_url)
 
         # Select highest bitrate index = 3
-        random_variant = parsed_master_m3u8.playlists[3]
+        variant = parsed_master_m3u8.playlists[3]
 
-        variant_url = "{base_url}/{variant}".format(base_url=base_url, variant=random_variant.uri)
+        variant_url = "{base_url}/{variant}".format(base_url=base_url, variant=variant.uri)
         variant_m3u8 = self.client.get(variant_url, name="merged")
         parsed_variant_m3u8 = m3u8.M3U8(content=variant_m3u8.text, base_uri=base_url)
 
         # get all the segments
         for segment in parsed_variant_m3u8.segments:
-            logger.info("Getting segment {0}".format(segment.absolute_uri))
+            logger.info(segment.absolute_uri)
             seg_get = self.client.get(segment.absolute_uri, name="merged")
             sleep = segment.duration - seg_get.elapsed.total_seconds()
-            logger.info("Request took {elapsed} and segment duration is {duration}. Sleeping for {sleep}".format(
-                elapsed=seg_get.elapsed.total_seconds(), duration=segment.duration, sleep=sleep))
-            self._sleep(sleep)
+            # self._sleep(sleep) # Optional delay after requesting segment
 
 
 class MyLocust(HttpLocust):

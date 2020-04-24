@@ -7,7 +7,7 @@ with open('README.md') as f:
     readme = f.read()
 
 setup(
-    name='Locust-streaming',
+    name='streaming_load_testing',
     version='0.1.0',
     description='Load testing for video streaming setups',
     long_description=readme,
