@@ -143,7 +143,7 @@ in your computer and pull the following image from Docker Hub.
 ```
 docker pull broyson/locust-streaming:latest
 ```
-Replace the environment variables HOST_URL  and MANIFEST_FILE  with the
+Replace the environment variables ORIGIN_IP  and MANIFEST_FILE  with the
 Manifest url points that you would like to stress test.
 
 Example using Docker image with external MPEG-DASH manifest
@@ -155,7 +155,7 @@ docker run \
     -e "mode=vod" \
     -e "play_mode=full_playback" \
     -e "bitrate=lowest_bitrate" \
-    locust-streaming \
+    broyson/locust-streaming:latest \
     -f /load_generator/locustfiles/vod_dash_hls_sequence.py \
     --no-web -c 1 -r 1 --run-time 10s --only-summary
 ```
@@ -163,12 +163,12 @@ docker run \
 Example using Docker image with MPEG-DASH Manifest 
 ```
 docker run \
-    -e "HOST_URL=http://192.168.178.233" \
+    -e "HOST_URL=http://${ORIGIN_IP}" \
     -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd" \
     -e "mode=vod" \
     -e "play_mode=full_playback" \
     -e "bitrate=lowest_bitrate" \
-    locust-streaming \
+    broyson/locust-streaming:latest \
     -f /load_generator/locustfiles/vod_dash_hls_sequence.py \
     --no-web -c 1 -r 1 --run-time 10s --only-summary
 ```
@@ -177,13 +177,13 @@ Example using Docker image with local HLS manifest
 
 ```
 docker run \
-    -e "HOST_URL=http://192.168.178.233" \
+    -e "HOST_URL=http://${ORIGIN_IP}" \
     -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.m3u8" \
     -e "mode=vod" \
     -e "play_mode=full_playback" \
     -e "bitrate=lowest_bitrate" \
     -v ${PWD}/:/test/ \
-    locust-streaming  \
+    broyson/locust-streaming:latest  \
     -f /test/load_generator/locustfiles/vod_dash_hls_sequence.py \
     --no-web -c 1 -r 1 --run-time 10s --only-summary
 ```
