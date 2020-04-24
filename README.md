@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3765401.svg)](https://doi.org/10.5281/zenodo.3765401)
+
 # Locust-streaming
 
 Load generation tool for evaluation of DASH and HLS video streaming setups
@@ -133,12 +135,32 @@ HOST_URL=http://${HOST} \
   bitrate=highest_bitrate \
   locust -f locustfiles/vod_dash_hls_sequence.py \
   --no-web -c 1 -r 1 --run-time 10s --only-summary
-
 ```
 
-## Using load_generator with docker image
+## Using a Locust-streaming Docker image from Docker-hub
+In order to run the following examples you will need to have Docker installed
+in your computer and pull the following image from Docker Hub.
+```
+docker pull broyson/locust-streaming:latest
+```
+Replace the environment variables HOST_URL  and MANIFEST_FILE  with the
+Manifest url points that you would like to stress test.
 
-Example using Docker image for an MPEG-DASH manifet
+Example using Docker image with external MPEG-DASH manifest
+```
+External MPEG-DASH manifest
+docker run \
+    -e "HOST_URL=https://demo.unified-streaming.com" \
+    -e "MANIFEST_FILE=/video/ateam/ateam.ism/ateam.mpd" \
+    -e "mode=vod" \
+    -e "play_mode=full_playback" \
+    -e "bitrate=lowest_bitrate" \
+    locust-streaming \
+    -f /load_generator/locustfiles/vod_dash_hls_sequence.py \
+    --no-web -c 1 -r 1 --run-time 10s --only-summary
+```
+
+Example using Docker image with MPEG-DASH Manifest 
 ```
 docker run \
     -e "HOST_URL=http://192.168.178.233" \
@@ -151,11 +173,12 @@ docker run \
     --no-web -c 1 -r 1 --run-time 10s --only-summary
 ```
 
-In case you need to use other Locust files that are outside the Docker image.
+Example using Docker image with local HLS manifest
+
 ```
 docker run \
     -e "HOST_URL=http://192.168.178.233" \
-    -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.mpd" \
+    -e "MANIFEST_FILE=tears-of-steel-avc1.ism/.m3u8" \
     -e "mode=vod" \
     -e "play_mode=full_playback" \
     -e "bitrate=lowest_bitrate" \
@@ -163,7 +186,6 @@ docker run \
     locust-streaming  \
     -f /test/load_generator/locustfiles/vod_dash_hls_sequence.py \
     --no-web -c 1 -r 1 --run-time 10s --only-summary
-
 ```
 
 # Locust set in distributed mode
