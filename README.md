@@ -1,5 +1,8 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3765401.svg)](https://doi.org/10.5281/zenodo.3765401)
 
+# NOTE
+This repository is a work in progress and it will be moved to https://github.com/unifiedstreaming for future releases.
+
 # Locust-streaming
 
 Load generation tool for evaluation of DASH and HLS video streaming setups
